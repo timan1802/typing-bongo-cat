@@ -1,35 +1,18 @@
-<!-- Plugin Configuration File. Read more: https://plugins.jetbrains.com/docs/intellij/plugin-configuration-file.html -->
 <idea-plugin>
-  <!-- Unique identifier of the plugin. It should be FQN. It cannot be changed between the plugin versions. -->
-  <id>com.learnershi.com.cat-mode</id>
+  <id>com.github.timan1802.typingbongocat</id>
+  <name>Typing-Bongo-Cat</name>
+  <vendor>timan1802</vendor>
 
-  <!-- Public plugin name should be written in Title Case.
-       Guidelines: https://plugins.jetbrains.com/docs/marketplace/plugin-overview-page.html#plugin-name -->
-  <name>Cat-mode</name>
-
-  <!-- A displayed Vendor name or Organization ID displayed on the Plugins Page. -->
-  <vendor url="https://www.yourcompany.com">YourCompany</vendor>
-
-  <!-- Description of the plugin displayed on the Plugin Page and IDE Plugin Manager.
-       Guidelines: https://plugins.jetbrains.com/docs/marketplace/plugin-overview-page.html#plugin-description -->
   <description><![CDATA[
     Enter short description for your plugin here.<br>
     <em>most HTML tags may be used</em>
   ]]></description>
 
-  <!-- Product and plugin compatibility requirements.
-       Read more: https://plugins.jetbrains.com/docs/intellij/plugin-compatibility.html -->
   <depends>com.intellij.modules.platform</depends>
-
-  <!-- Extension points defined by the plugin.
-       Read more: https://plugins.jetbrains.com/docs/intellij/plugin-extension-points.html -->
-  <application-components>
-    <component>
-      <implementation-class>com.github.timan1802.catmode.PowerMode</implementation-class>
-    </component>
-  </application-components>
+  <applicationListeners>
+    <listener class="com.github.timan1802.typingbongocat.TypingBongoCatStartup" topic="com.intellij.ide.AppLifecycleListener"/>
+  </applicationListeners>
 
   <extensions defaultExtensionNs="com.intellij">
-    <applicationConfigurable groupId="appearance" groupWeight="20" id="power.mode" displayName="Power mode" instance="com.github.timan1802.catmode.PowerModeConfigurable" />
   </extensions>
 </idea-plugin>

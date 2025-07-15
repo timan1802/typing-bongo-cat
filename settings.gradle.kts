@@ -1,1 +1,1 @@
-rootProject.name = "cat-mode"
+rootProject.name = "typing-bongo-cat"
