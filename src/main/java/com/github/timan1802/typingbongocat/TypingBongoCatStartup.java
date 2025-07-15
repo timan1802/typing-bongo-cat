@@ -4,7 +4,6 @@ import com.intellij.ide.AppLifecycleListener;
 import com.intellij.openapi.application.ApplicationManager;
 import java.util.List;
 import org.jetbrains.annotations.NotNull;
-//import test.CatMode;
 
 /**
  * 애플리케이션 시작 시 KeyboardActionService를 초기화하는 리스너입니다.
