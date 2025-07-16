@@ -56,8 +56,8 @@ public class BongoCatAnimator extends JComponent implements ComponentListener, D
      private int consecutiveKeyPressCount = 0;
      private volatile boolean isBamEffectActive = false;
      private long bamStartTime;
-    // BAM 효과 중 입력된 키를 저장하기 위한 큐(카운터)
-    private int queuedKeyPressCount = 0;
+    // BAM 효과 중 입력된 키를 저장하기 위한 카운터
+    private int keyPressCount = 0;
     private Point lastQueuedCaretPosition;
 
     private int x;
@@ -106,9 +106,9 @@ public class BongoCatAnimator extends JComponent implements ComponentListener, D
                 ((Timer) e.getSource()).stop();
 
                 // 효과가 끝난 후, 큐에 쌓인 입력이 있는지 확인
-                if (queuedKeyPressCount > 0) {
+                if (keyPressCount > 0) {
                     // 쌓인 입력을 기반으로 새로운 타이핑 시퀀스를 시작
-                    consecutiveKeyPressCount = queuedKeyPressCount;
+                    consecutiveKeyPressCount = keyPressCount;
                     lastKeyPressTime = System.currentTimeMillis();
                     x = lastQueuedCaretPosition.x;
                     y = lastQueuedCaretPosition.y;
@@ -118,7 +118,7 @@ public class BongoCatAnimator extends JComponent implements ComponentListener, D
                     middleTimer.restart();
                     hideTimer.restart();
 
-                    queuedKeyPressCount = 0;
+                    keyPressCount = 0;
                     lastQueuedCaretPosition = null;
                 }
             } else if (elapsed >= BAM_SHAKE_DURATION_MS) {
@@ -169,7 +169,7 @@ public class BongoCatAnimator extends JComponent implements ComponentListener, D
 
         // BAM 효과가 진행 중일 때는 키 입력만 큐에 저장
         if (isBamEffectActive) {
-            queuedKeyPressCount++;
+            keyPressCount++;
             lastQueuedCaretPosition = caretPosition;
             return;
         }
