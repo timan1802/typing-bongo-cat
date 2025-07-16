@@ -29,9 +29,9 @@ public class BongoCatAnimator extends JComponent implements ComponentListener, D
     private static final int CARET_Y_OFFSET = 10; // 캐럿 위의 Y축 간격
 
     // --- 이미지 리소스 로딩 ---
-    private static final BufferedImage BONGO_RIGHT_IMG = loadImage("/img/bongo_right.png");
-    private static final BufferedImage BONGO_LEFT_IMG = loadImage("/img/bongo_left.png");
-    private static final BufferedImage BONGO_MIDDLE_IMG = loadImage("/img/bongo_middle.png");
+    private static final BufferedImage BONGO_RIGHT_IMG = loadImage("/img/cat/100/bongo_right.png");
+    private static final BufferedImage BONGO_LEFT_IMG = loadImage("/img/cat/100/bongo_left.png");
+    private static final BufferedImage BONGO_MIDDLE_IMG = loadImage("/img/cat/100/bongo_middle.png");
 
     private final JComponent parent;
     private final Editor editor;
@@ -74,7 +74,8 @@ public class BongoCatAnimator extends JComponent implements ComponentListener, D
                 return null;
             }
             BufferedImage originalImage = ImageIO.read(stream);
-            return resizeImage(originalImage, IMAGE_SIZE, IMAGE_SIZE);
+//            return resizeImage(originalImage, IMAGE_SIZE, IMAGE_SIZE);
+            return originalImage;
         } catch (IOException e) {
             LOG.error("이미지 로딩 실패: " + path, e);
             return null;

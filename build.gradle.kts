@@ -6,7 +6,7 @@ plugins {
 }
 
 group = "com.github.timan1802.typingbongocat"
-version = "1.0.3"
+version = "1.0.4"
 
 repositories {
     mavenCentral()
@@ -36,7 +36,7 @@ intellijPlatform {
         }
 
         changeNotes = """
-            set require-restart
+            Delete resizeImage and modify the image itself to width 100
     """.trimIndent()
     }
 }
