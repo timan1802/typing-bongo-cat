@@ -1,4 +1,4 @@
-<idea-plugin>
+<idea-plugin require-restart="true">
   <id>com.github.timan1802.typingbongocat</id>
   <name>Typing-Bongo-Cat</name>
   <description><![CDATA[

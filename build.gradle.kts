@@ -6,7 +6,7 @@ plugins {
 }
 
 group = "com.github.timan1802.typingbongocat"
-version = "1.0.2"
+version = "1.0.3"
 
 repositories {
     mavenCentral()
@@ -36,8 +36,7 @@ intellijPlatform {
         }
 
         changeNotes = """
-      add since version,
-      chnage pluginicon
+            set require-restart
     """.trimIndent()
     }
 }
