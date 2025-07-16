@@ -6,7 +6,7 @@ plugins {
 }
 
 group = "com.github.timan1802.typingbongocat"
-version = "1.0.0"
+version = "1.0.2"
 
 repositories {
     mavenCentral()
@@ -31,8 +31,14 @@ dependencies {
 intellijPlatform {
     pluginConfiguration {
         ideaVersion {
-            sinceBuild = "251"
+            sinceBuild = "242"
+            untilBuild = "251.*"
         }
+
+        changeNotes = """
+      add since version,
+      chnage pluginicon
+    """.trimIndent()
     }
 }
 
