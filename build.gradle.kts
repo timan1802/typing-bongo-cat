@@ -6,7 +6,7 @@ plugins {
 }
 
 group = "com.github.timan1802.typingbongocat"
-version = "1.0.4"
+version = "1.1.4"
 
 repositories {
     mavenCentral()
@@ -36,7 +36,7 @@ intellijPlatform {
         }
 
         changeNotes = """
-            Delete resizeImage and modify the image itself to width 100
+            Add Bam Effect
     """.trimIndent()
     }
 }

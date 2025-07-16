@@ -47,7 +47,6 @@ final class BongoCatController implements EditorFactoryListener, Disposable {
     }
 
     private void updateUI(Editor editor) {
-        // --- 추가된 부분: 안정성 강화 ---
         // SwingUtilities.invokeLater에 의해 코드가 실행되는 시점에는
         // 에디터가 이미 닫혔을 수 있으므로, isDisposed 체크를 추가합니다.
         if (editor.isDisposed()) {
