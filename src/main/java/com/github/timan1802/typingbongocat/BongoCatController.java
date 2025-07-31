@@ -9,11 +9,12 @@ import com.intellij.openapi.editor.ScrollingModel;
 import com.intellij.openapi.editor.VisualPosition;
 import com.intellij.openapi.editor.event.EditorFactoryEvent;
 import com.intellij.openapi.editor.event.EditorFactoryListener;
-import java.awt.Point;
+import org.jetbrains.annotations.NotNull;
+
+import javax.swing.*;
+import java.awt.*;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import javax.swing.SwingUtilities;
-import org.jetbrains.annotations.NotNull;
 
 
 @Service(Service.Level.APP)
@@ -46,6 +47,31 @@ final class BongoCatController implements EditorFactoryListener, Disposable {
         SwingUtilities.invokeLater(() -> updateUI(editor));
     }
 
+    /**
+     * 캐럿 위치가 에디터 제일 상단이거나, 제일 좌측일 경우 이미지가 안 나오는 것을 방지
+     * @param editor
+     * @return
+     */
+    private static @NotNull VisualPosition getVisualPosition(final Editor editor) {
+        VisualPosition currentVisualPosition = editor.getCaretModel().getVisualPosition();
+        int currentColumn = currentVisualPosition.getColumn();
+        int currentLine = currentVisualPosition.getLine(); // 0부터 시작
+        int replaceLine = currentLine;
+        int replaceColumn = currentColumn;
+
+        //7번째 단어까지는 오른쪽으로 좀더 이동해서 나오도록.
+        if(currentColumn < 7 ){
+            replaceColumn = 7;
+        }
+
+        //6번째 줄까지만 하단에 나오게.
+        if(currentLine < 6 ){
+            replaceLine = currentLine + 7;
+        }
+
+        return new VisualPosition(replaceLine, replaceColumn);
+    }
+
     private void updateUI(Editor editor) {
         // SwingUtilities.invokeLater에 의해 코드가 실행되는 시점에는
         // 에디터가 이미 닫혔을 수 있으므로, isDisposed 체크를 추가합니다.
@@ -55,8 +81,9 @@ final class BongoCatController implements EditorFactoryListener, Disposable {
 
         final BongoCatAnimator bongoCatAnimator = particleContainers.computeIfAbsent(editor, BongoCatAnimator::new);
 
-        VisualPosition visualPosition = editor.getCaretModel().getVisualPosition();
-        Point point = editor.visualPositionToXY(visualPosition);
+        VisualPosition newVisualPosition = getVisualPosition(editor);
+
+        Point point = editor.visualPositionToXY(newVisualPosition);
         ScrollingModel scrollingModel = editor.getScrollingModel();
         point.x -= scrollingModel.getHorizontalScrollOffset();
         point.y -= scrollingModel.getVerticalScrollOffset();
