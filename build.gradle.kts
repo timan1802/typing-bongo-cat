@@ -36,7 +36,7 @@ intellijPlatform {
         }
 
         changeNotes = """
-            Add Bam Effect
+            캐롯이 좌측 상단이나 앞쪽 컬럼에 위치해 있을 때 이미지 안 보이는 부분 수정. 
     """.trimIndent()
     }
 }
