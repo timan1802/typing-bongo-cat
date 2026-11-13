@@ -23,14 +23,15 @@ public class BongoCatAnimator extends JComponent implements ComponentListener, D
 
     private static final Logger LOG = Logger.getInstance(BongoCatAnimator.class);
 
-    // --- 추가된 부분: 상수 정의 ---
-    private static final int IMAGE_SIZE = 100; // 이미지 크기
+    // --- 상수 정의 ---
+    private static final int IMAGE_WIDTH = 100; // 이미지 너비 (높이는 원본 비율 유지)
     private static final int TYPING_INTERVAL_MS = 500; // 연속 입력으로 간주할 시간 (ms)
     private static final int MIDDLE_STATE_DELAY_MS = 500; // 중간 상태로 바뀌기까지의 지연 시간 (ms)
     private static final int HIDE_DELAY_MS = 1000; // 이미지가 사라지기까지의 지연 시간 (ms)
-    private static final int CARET_Y_OFFSET = 10; // 캐럿 위의 Y축 간격
+    private static final int CARET_Y_OFFSET = 10; // 캐럿과 이미지 사이의 Y축 간격
     // --- BAM 효과 상수 ---
     private static final int BAM_THRESHOLD = 20; // 'BAM!' 효과 발동 연속 입력 횟수
+    private static final int BAM_FRAME_INTERVAL_MS = 25; // 'BAM!' 애니메이션 프레임 간격 (약 40fps)
     private static final int BAM_SHAKE_DURATION_MS = 300; // 'BAM!' 효과 지속 시간 (ms)
     private static final int BAM_GROW_FADE_DURATION_MS = 1200; // 'BAM!' 확대/소멸 효과 시간 (ms)
     private static final int BAM_TOTAL_DURATION_MS = BAM_SHAKE_DURATION_MS + BAM_GROW_FADE_DURATION_MS;
@@ -45,26 +46,25 @@ public class BongoCatAnimator extends JComponent implements ComponentListener, D
 
     private final JComponent parent;
     private final Editor editor;
-     private final Random random = new Random();
-    private long lastKeyPressTime = 0;
+    private final Random random = new Random();
     // --- 타이머 ---
     private final Timer middleTimer;
-    private boolean lastHandWasRight = false;
+    private final Timer hideTimer;
     private final Timer bamEffectTimer;
     // --- 상태 변수 ---
     private volatile BufferedImage currentImage;
-     private int consecutiveKeyPressCount = 0;
-     private volatile boolean isBamEffectActive = false;
-     private long bamStartTime;
-    // BAM 효과 중 입력된 키를 저장하기 위한 카운터
-    private int keyPressCount = 0;
-    private Point lastQueuedCaretPosition;
+    private long lastKeyPressTime = 0;
+    private boolean lastHandWasRight = false;
+    private int consecutiveKeyPressCount = 0;
+    private volatile boolean isBamEffectActive = false;
+    private long bamStartTime;
+    // BAM 효과 중 마지막으로 입력된 캐럿 위치 (null 이면 대기 중인 입력 없음)
+    private Point queuedCaretPositionDuringBam;
 
     private int x;
     private int y;
     // BAM 애니메이션을 위한 변수
     private float currentScale = 1.0f;
-    private final Timer hideTimer;
     private float currentAlpha = 1.0f;
 
     public BongoCatAnimator(Editor editor) {
@@ -96,31 +96,11 @@ public class BongoCatAnimator extends JComponent implements ComponentListener, D
         hideTimer.setRepeats(false);
 
         // BAM 효과 전체(흔들림 + 확대/소멸)를 제어하는 타이머
-        bamEffectTimer = new Timer(25, e -> { // 25ms (약 40fps)
+        bamEffectTimer = new Timer(BAM_FRAME_INTERVAL_MS, e -> {
             long elapsed = System.currentTimeMillis() - bamStartTime;
 
             if (elapsed >= BAM_TOTAL_DURATION_MS) {
-                // --- BAM 효과 완전 종료 ---
-                isBamEffectActive = false;
-                currentImage = null;
-                ((Timer) e.getSource()).stop();
-
-                // 효과가 끝난 후, 큐에 쌓인 입력이 있는지 확인
-                if (keyPressCount > 0) {
-                    // 쌓인 입력을 기반으로 새로운 타이핑 시퀀스를 시작
-                    consecutiveKeyPressCount = keyPressCount;
-                    lastKeyPressTime = System.currentTimeMillis();
-                    x = lastQueuedCaretPosition.x;
-                    y = lastQueuedCaretPosition.y;
-                    currentImage = BONGO_RIGHT_IMG;
-                    lastHandWasRight = true;
-
-                    middleTimer.restart();
-                    hideTimer.restart();
-
-                    keyPressCount = 0;
-                    lastQueuedCaretPosition = null;
-                }
+                finishBamEffect();
             } else if (elapsed >= BAM_SHAKE_DURATION_MS) {
                 // --- 확대 및 소멸 단계 ---
                 float progress = (float) (elapsed - BAM_SHAKE_DURATION_MS) / BAM_GROW_FADE_DURATION_MS;
@@ -143,16 +123,21 @@ public class BongoCatAnimator extends JComponent implements ComponentListener, D
                 LOG.warn("Resource not found: " + path);
                 return null;
             }
-            BufferedImage originalImage = ImageIO.read(stream);
-            return resizeImage(originalImage, IMAGE_SIZE, IMAGE_SIZE);
+            return resizeToWidth(ImageIO.read(stream), IMAGE_WIDTH);
         } catch (IOException e) {
             LOG.error("Image loading failure: " + path, e);
             return null;
         }
     }
 
-    private static BufferedImage resizeImage(BufferedImage originalImage, int targetWidth, int targetHeight) {
-        if (originalImage == null) return null;
+    /**
+     * 원본 비율을 유지하며 지정한 너비로 리사이즈합니다. 이미 해당 너비면 원본을 그대로 반환합니다.
+     */
+    private static BufferedImage resizeToWidth(BufferedImage originalImage, int targetWidth) {
+        if (originalImage == null || originalImage.getWidth() == targetWidth) {
+            return originalImage;
+        }
+        int targetHeight = Math.round((float) originalImage.getHeight() * targetWidth / originalImage.getWidth());
         BufferedImage resizedImage = ImageUtil.createImage(targetWidth, targetHeight, BufferedImage.TYPE_INT_ARGB);
         Graphics2D g2d = resizedImage.createGraphics();
         g2d.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
@@ -163,36 +148,32 @@ public class BongoCatAnimator extends JComponent implements ComponentListener, D
         return resizedImage;
     }
 
+    /**
+     * @param caretPosition 뷰포트(이 컴포넌트) 기준 캐럿 줄의 좌상단 좌표
+     */
     public void update(Point caretPosition) {
-        this.x = caretPosition.x;
-        this.y = caretPosition.y;
-
-        // BAM 효과가 진행 중일 때는 키 입력만 큐에 저장
+        // BAM 효과가 진행 중일 때는 위치를 바꾸지 않고 마지막 입력 위치만 저장
         if (isBamEffectActive) {
-            keyPressCount++;
-            lastQueuedCaretPosition = caretPosition;
+            queuedCaretPositionDuringBam = caretPosition;
             return;
         }
+
+        this.x = caretPosition.x;
+        this.y = caretPosition.y;
 
         // 새로운 키 입력이 있었으므로, 기존의 모든 타이머와 효과를 중지합니다.
         middleTimer.stop();
         hideTimer.stop();
         bamEffectTimer.stop();
 
-        
         long now = System.currentTimeMillis();
         boolean isConsecutive = (now - lastKeyPressTime) < TYPING_INTERVAL_MS;
 
         if (isConsecutive) {
             consecutiveKeyPressCount++;
             // 연속 입력: 손을 교체합니다.
-            if (lastHandWasRight) {
-                currentImage = BONGO_LEFT_IMG;
-                lastHandWasRight = false;
-            } else {
-                currentImage = BONGO_RIGHT_IMG;
-                lastHandWasRight = true;
-            }
+            currentImage = lastHandWasRight ? BONGO_LEFT_IMG : BONGO_RIGHT_IMG;
+            lastHandWasRight = !lastHandWasRight;
         } else {
             // 새로운 입력 시작: 카운터를 1로 설정하고 오른손으로 시작합니다.
             consecutiveKeyPressCount = 1;
@@ -206,58 +187,95 @@ public class BongoCatAnimator extends JComponent implements ComponentListener, D
 
         lastKeyPressTime = now;
         this.repaint();
-     }
+    }
 
-     private void showBamEffect() {
+    private void showBamEffect() {
         // 다른 타이머 중지
         middleTimer.stop();
         hideTimer.stop();
 
-         // BAM 효과 상태 설정
-         currentImage = BONGO_BAM_IMG;
-         isBamEffectActive = true;
-         bamStartTime = System.currentTimeMillis();
+        // BAM 효과 상태 설정
+        currentImage = BONGO_BAM_IMG;
+        isBamEffectActive = true;
+        bamStartTime = System.currentTimeMillis();
         // 애니메이션 변수 초기화
         currentScale = 1.0f;
         currentAlpha = 1.0f;
 
-         // 흔들림 효과 타이머 시작
         bamEffectTimer.start();
-     }
+    }
+
+    private void finishBamEffect() {
+        isBamEffectActive = false;
+        currentImage = null;
+        bamEffectTimer.stop();
+
+        if (queuedCaretPositionDuringBam == null) {
+            return;
+        }
+        // BAM 중 들어온 입력은 새 타이핑 시퀀스의 첫 입력으로만 취급합니다.
+        // (대기 중 입력 수를 연속 입력 수로 넘기면 BAM 이 연쇄 발동합니다.)
+        Point queuedCaretPosition = queuedCaretPositionDuringBam;
+        queuedCaretPositionDuringBam = null;
+        lastKeyPressTime = 0;
+        update(queuedCaretPosition);
+    }
+
+    /** [-BAM_SHAKE_INTENSITY, BAM_SHAKE_INTENSITY] 범위의 대칭 흔들림 오프셋 */
+    private int randomShakeOffset() {
+        return random.nextInt(BAM_SHAKE_INTENSITY * 2 + 1) - BAM_SHAKE_INTENSITY;
+    }
+
+    /** 이미지가 뷰포트 좌우로 잘리지 않도록 X 좌표를 보정합니다. */
+    private int clampDrawX(int imageWidth) {
+        int centeredX = this.x - imageWidth / 2;
+        int maxX = Math.max(0, getWidth() - imageWidth);
+        return Math.max(0, Math.min(centeredX, maxX));
+    }
+
+    /** 기본은 캐럿 위, 뷰포트 상단에서 잘리면 캐럿 줄 아래에 그립니다. */
+    private int resolveDrawY(int imageHeight) {
+        int aboveCaretY = this.y - imageHeight - CARET_Y_OFFSET;
+        if (aboveCaretY >= 0) {
+            return aboveCaretY;
+        }
+        return this.y + editor.getLineHeight() + CARET_Y_OFFSET;
+    }
 
     @Override
     protected void paintComponent(Graphics g) {
         super.paintComponent(g);
-        if (currentImage != null) {
-            Graphics2D g2d = (Graphics2D) g.create();
+        BufferedImage image = currentImage;
+        if (image == null) {
+            return;
+        }
+        Graphics2D g2d = (Graphics2D) g.create();
+        try {
+            int imgWidth = image.getWidth();
+            int imgHeight = image.getHeight();
+            int drawX = clampDrawX(imgWidth);
+            int drawY = resolveDrawY(imgHeight);
 
-            try {
-                int drawX = this.x - (currentImage.getWidth() / 2);
-                int drawY = this.y - currentImage.getHeight() - CARET_Y_OFFSET;
-
-                if (isBamEffectActive) {
-                    // 흔들림 효과 적용
-                    if (System.currentTimeMillis() - bamStartTime < BAM_SHAKE_DURATION_MS) {
-                        drawX += random.nextInt(BAM_SHAKE_INTENSITY * 2) - BAM_SHAKE_INTENSITY;
-                        drawY += random.nextInt(BAM_SHAKE_INTENSITY * 2) - BAM_SHAKE_INTENSITY;
-                    }
-
-                    // 확대 및 투명도 효과 적용
-                    int imgWidth = currentImage.getWidth();
-                    int imgHeight = currentImage.getHeight();
-                    int scaledWidth = (int) (imgWidth * currentScale);
-                    int scaledHeight = (int) (imgHeight * currentScale);
-                    int scaledDrawX = drawX - (scaledWidth - imgWidth) / 2;
-                    int scaledDrawY = drawY - (scaledHeight - imgHeight) / 2;
-
-                    g2d.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, Math.max(0, Math.min(1, currentAlpha))));
-                    g2d.drawImage(currentImage, scaledDrawX, scaledDrawY, scaledWidth, scaledHeight, null);
-                } else {
-                    g2d.drawImage(currentImage, drawX, drawY, null);
+            if (isBamEffectActive) {
+                // 흔들림 효과 적용
+                if (System.currentTimeMillis() - bamStartTime < BAM_SHAKE_DURATION_MS) {
+                    drawX += randomShakeOffset();
+                    drawY += randomShakeOffset();
                 }
-            } finally {
-                g2d.dispose();
+
+                // 확대 및 투명도 효과 적용 (중심 기준 확대)
+                int scaledWidth = (int) (imgWidth * currentScale);
+                int scaledHeight = (int) (imgHeight * currentScale);
+                int scaledDrawX = drawX - (scaledWidth - imgWidth) / 2;
+                int scaledDrawY = drawY - (scaledHeight - imgHeight) / 2;
+
+                g2d.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, Math.max(0, Math.min(1, currentAlpha))));
+                g2d.drawImage(image, scaledDrawX, scaledDrawY, scaledWidth, scaledHeight, null);
+            } else {
+                g2d.drawImage(image, drawX, drawY, null);
             }
+        } finally {
+            g2d.dispose();
         }
     }
 
@@ -272,10 +290,14 @@ public class BongoCatAnimator extends JComponent implements ComponentListener, D
     }
 
     @Override
-    public void componentShown(ComponentEvent e) {}
+    public void componentShown(ComponentEvent e) {
+        // 표시 상태 변화는 위치·크기에 영향이 없으므로 처리하지 않습니다.
+    }
 
     @Override
-    public void componentHidden(ComponentEvent e) {}
+    public void componentHidden(ComponentEvent e) {
+        // 표시 상태 변화는 위치·크기에 영향이 없으므로 처리하지 않습니다.
+    }
 
     /**
      * 이 컴포넌트가 소멸될 때 호출되어, 부모로부터 자신을 제거하고 타이머를 중지하여 메모리 누수를 방지합니다.

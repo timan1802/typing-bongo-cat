@@ -32,7 +32,8 @@ intellijPlatform {
     pluginConfiguration {
         ideaVersion {
             sinceBuild = "242"
-            untilBuild = "251.*"
+            // 상한을 두지 않아 이후 IDE 버전에도 설치 가능 (호환성은 JetBrains Plugin Verifier 로 확인)
+            untilBuild = provider { null }
         }
 
         changeNotes = """
