@@ -6,7 +6,7 @@ plugins {
 }
 
 group = "com.github.timan1802.typingbongocat"
-version = "1.1.5"
+version = "1.1.6"
 
 repositories {
     mavenCentral()
@@ -37,8 +37,14 @@ intellijPlatform {
         }
 
         changeNotes = """
-            캐롯이 좌측 상단이나 앞쪽 컬럼에 위치해 있을 때 이미지 안 보이는 부분 수정. 
-    """.trimIndent()
+            <ul>
+              <li>최신 IDE 버전(2026.3 등) 지원: 호환 빌드 상한 제거</li>
+              <li>이미지 비율이 찌그러지던 문제 수정</li>
+              <li>화면 상단·좌우 끝에서 이미지가 잘리던 문제 수정 (스크롤·줌 상태 포함)</li>
+              <li>BAM 효과가 연쇄 발동하거나 위치가 튀던 문제 수정</li>
+              <li>성능 개선: 타이핑·스크롤 시 에디터 전체 다시 그리기 제거, 플러그인 용량 약 80% 감소</li>
+            </ul>
+        """.trimIndent()
     }
 }
 
