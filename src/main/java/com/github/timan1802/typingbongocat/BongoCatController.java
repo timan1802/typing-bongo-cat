@@ -19,7 +19,7 @@ import java.util.concurrent.ConcurrentHashMap;
 @Service(Service.Level.APP)
 final class BongoCatController implements EditorFactoryListener, Disposable {
 
-    private final Map<Editor, BongoCatAnimator> particleContainers = new ConcurrentHashMap<>();
+    private final Map<Editor, BongoCatAnimator> animatorsByEditor = new ConcurrentHashMap<>();
 
     public BongoCatController() {
         EditorFactory.getInstance().addEditorFactoryListener(this, this);
@@ -34,9 +34,9 @@ final class BongoCatController implements EditorFactoryListener, Disposable {
 
     @Override
     public void editorReleased(@NotNull EditorFactoryEvent event) {
-        BongoCatAnimator container = particleContainers.remove(event.getEditor());
-        if (container != null) {
-            container.dispose();
+        BongoCatAnimator animator = animatorsByEditor.remove(event.getEditor());
+        if (animator != null) {
+            animator.dispose();
         }
     }
 
@@ -51,7 +51,7 @@ final class BongoCatController implements EditorFactoryListener, Disposable {
             return;
         }
 
-        final BongoCatAnimator bongoCatAnimator = particleContainers.computeIfAbsent(editor, BongoCatAnimator::new);
+        final BongoCatAnimator bongoCatAnimator = animatorsByEditor.computeIfAbsent(editor, BongoCatAnimator::new);
 
         // 뷰포트 경계에서 잘리지 않도록 하는 위치 보정은 BongoCatAnimator 가 그릴 때 처리합니다.
         Point point = editor.visualPositionToXY(editor.getCaretModel().getVisualPosition());
@@ -64,7 +64,7 @@ final class BongoCatController implements EditorFactoryListener, Disposable {
 
     @Override
     public void dispose() {
-        particleContainers.values().forEach(BongoCatAnimator::dispose);
-        particleContainers.clear();
+        animatorsByEditor.values().forEach(BongoCatAnimator::dispose);
+        animatorsByEditor.clear();
     }
 }
