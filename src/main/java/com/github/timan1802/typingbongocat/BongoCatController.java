@@ -29,10 +29,8 @@ final class BongoCatController implements EditorFactoryListener, Disposable {
         return ApplicationManager.getApplication().getService(BongoCatController.class);
     }
 
-    @Override
-    public void editorCreated(@NotNull EditorFactoryEvent event) {
-        particleContainers.computeIfAbsent(event.getEditor(), BongoCatAnimator::new);
-    }
+    // editorCreated 는 구현하지 않습니다. 애니메이터는 실제로 타이핑이 일어난 에디터에만
+    // updateUI() 에서 지연 생성합니다. (diff·콘솔·미리보기 등 모든 에디터에 붙이지 않기 위함)
 
     @Override
     public void editorReleased(@NotNull EditorFactoryEvent event) {

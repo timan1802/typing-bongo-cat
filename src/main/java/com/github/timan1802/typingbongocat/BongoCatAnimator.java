@@ -3,12 +3,11 @@ package com.github.timan1802.typingbongocat;
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.editor.Editor;
-import com.intellij.util.ui.ImageUtil;
 import java.awt.AlphaComposite;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.Point;
-import java.awt.RenderingHints;
+import java.awt.Rectangle;
 import java.awt.event.ComponentEvent;
 import java.awt.event.ComponentListener;
 import java.awt.image.BufferedImage;
@@ -24,7 +23,6 @@ public class BongoCatAnimator extends JComponent implements ComponentListener, D
     private static final Logger LOG = Logger.getInstance(BongoCatAnimator.class);
 
     // --- 상수 정의 ---
-    private static final int IMAGE_WIDTH = 100; // 이미지 너비 (높이는 원본 비율 유지)
     private static final int TYPING_INTERVAL_MS = 500; // 연속 입력으로 간주할 시간 (ms)
     private static final int MIDDLE_STATE_DELAY_MS = 500; // 중간 상태로 바뀌기까지의 지연 시간 (ms)
     private static final int HIDE_DELAY_MS = 1000; // 이미지가 사라지기까지의 지연 시간 (ms)
@@ -38,11 +36,11 @@ public class BongoCatAnimator extends JComponent implements ComponentListener, D
     private static final int BAM_SHAKE_INTENSITY = 5; // 'BAM!' 효과 흔들림 강도 (pixels)
     private static final float BAM_MAX_SCALE = 2.0f; // 'BAM!' 효과 최대 확대 배율
 
-    // --- 이미지 리소스 로딩 ---
+    // --- 이미지 리소스 로딩 (모두 100px 너비로 미리 맞춘 파일이라 런타임 리사이즈 없음) ---
     private static final BufferedImage BONGO_RIGHT_IMG = loadImage("/img/cat/100/bongo_right.png");
     private static final BufferedImage BONGO_LEFT_IMG = loadImage("/img/cat/100/bongo_left.png");
     private static final BufferedImage BONGO_MIDDLE_IMG = loadImage("/img/cat/100/bongo_middle.png");
-    private static final BufferedImage BONGO_BAM_IMG = loadImage("/img/cat/457/bongo_bam.png");
+    private static final BufferedImage BONGO_BAM_IMG = loadImage("/img/cat/100/bongo_bam.png");
 
     private final JComponent parent;
     private final Editor editor;
@@ -66,6 +64,8 @@ public class BongoCatAnimator extends JComponent implements ComponentListener, D
     // BAM 애니메이션을 위한 변수
     private float currentScale = 1.0f;
     private float currentAlpha = 1.0f;
+    // 직전에 그린 이미지 영역. 다음 repaint 때 지워야 할 영역으로 사용 (null 이면 그린 것 없음)
+    private Rectangle lastImageArea;
 
     public BongoCatAnimator(Editor editor) {
         this.editor = editor;
@@ -82,7 +82,7 @@ public class BongoCatAnimator extends JComponent implements ComponentListener, D
             } else {
                 // 일반적인 멈춤: 중간 상태로 전환합니다.
                 currentImage = BONGO_MIDDLE_IMG;
-                repaint();
+                repaintImageArea();
             }
             // 효과를 처리했으므로 연속 입력 횟수를 초기화합니다.
             consecutiveKeyPressCount = 0;
@@ -91,7 +91,7 @@ public class BongoCatAnimator extends JComponent implements ComponentListener, D
 
         hideTimer = new Timer(HIDE_DELAY_MS, e -> {
             currentImage = null;
-            repaint();
+            repaintImageArea();
         });
         hideTimer.setRepeats(false);
 
@@ -112,7 +112,7 @@ public class BongoCatAnimator extends JComponent implements ComponentListener, D
                 currentAlpha = 1.0f;
             }
 
-            repaint();
+            repaintImageArea();
         });
         bamEffectTimer.setRepeats(true);
     }
@@ -123,29 +123,11 @@ public class BongoCatAnimator extends JComponent implements ComponentListener, D
                 LOG.warn("Resource not found: " + path);
                 return null;
             }
-            return resizeToWidth(ImageIO.read(stream), IMAGE_WIDTH);
+            return ImageIO.read(stream);
         } catch (IOException e) {
             LOG.error("Image loading failure: " + path, e);
             return null;
         }
-    }
-
-    /**
-     * 원본 비율을 유지하며 지정한 너비로 리사이즈합니다. 이미 해당 너비면 원본을 그대로 반환합니다.
-     */
-    private static BufferedImage resizeToWidth(BufferedImage originalImage, int targetWidth) {
-        if (originalImage == null || originalImage.getWidth() == targetWidth) {
-            return originalImage;
-        }
-        int targetHeight = Math.round((float) originalImage.getHeight() * targetWidth / originalImage.getWidth());
-        BufferedImage resizedImage = ImageUtil.createImage(targetWidth, targetHeight, BufferedImage.TYPE_INT_ARGB);
-        Graphics2D g2d = resizedImage.createGraphics();
-        g2d.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
-        g2d.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
-        g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-        g2d.drawImage(originalImage, 0, 0, targetWidth, targetHeight, null);
-        g2d.dispose();
-        return resizedImage;
     }
 
     /**
@@ -158,6 +140,9 @@ public class BongoCatAnimator extends JComponent implements ComponentListener, D
             return;
         }
 
+        // 숨어 있는 동안은 bounds 동기화를 건너뛰므로, 표시 직전에 뷰포트와 맞춥니다.
+        // (caretPosition 은 현재 뷰포트 기준 좌표)
+        updateBounds();
         this.x = caretPosition.x;
         this.y = caretPosition.y;
 
@@ -186,7 +171,7 @@ public class BongoCatAnimator extends JComponent implements ComponentListener, D
         hideTimer.restart();
 
         lastKeyPressTime = now;
-        this.repaint();
+        repaintImageArea();
     }
 
     private void showBamEffect() {
@@ -202,6 +187,7 @@ public class BongoCatAnimator extends JComponent implements ComponentListener, D
         currentScale = 1.0f;
         currentAlpha = 1.0f;
 
+        repaintImageArea();
         bamEffectTimer.start();
     }
 
@@ -209,6 +195,7 @@ public class BongoCatAnimator extends JComponent implements ComponentListener, D
         isBamEffectActive = false;
         currentImage = null;
         bamEffectTimer.stop();
+        repaintImageArea();
 
         if (queuedCaretPositionDuringBam == null) {
             return;
@@ -240,6 +227,38 @@ public class BongoCatAnimator extends JComponent implements ComponentListener, D
             return aboveCaretY;
         }
         return this.y + editor.getLineHeight() + CARET_Y_OFFSET;
+    }
+
+    /**
+     * 현재 이미지가 차지할 수 있는 최대 영역. BAM 중에는 최대 확대 배율과 흔들림 폭까지 포함합니다.
+     */
+    private Rectangle imageArea(BufferedImage image) {
+        int imgWidth = image.getWidth();
+        int imgHeight = image.getHeight();
+        Rectangle area = new Rectangle(clampDrawX(imgWidth), resolveDrawY(imgHeight), imgWidth, imgHeight);
+        if (isBamEffectActive) {
+            // 확대는 중심 기준이라 한쪽으로 (배율 - 1) / 2 만큼 늘어남. 정수 반올림 오차를 위해 1px 여유
+            int growX = (int) Math.ceil(imgWidth * (BAM_MAX_SCALE - 1.0f) / 2) + BAM_SHAKE_INTENSITY + 1;
+            int growY = (int) Math.ceil(imgHeight * (BAM_MAX_SCALE - 1.0f) / 2) + BAM_SHAKE_INTENSITY + 1;
+            area.grow(growX, growY);
+        }
+        return area;
+    }
+
+    /**
+     * 컴포넌트 전체가 아니라 직전 이미지 영역과 새 이미지 영역만 다시 그립니다.
+     * 투명 오버레이라 repaint() 전체 호출은 에디터 본문 전체 다시 그리기로 이어지기 때문입니다.
+     */
+    private void repaintImageArea() {
+        BufferedImage image = currentImage;
+        Rectangle newImageArea = image == null ? null : imageArea(image);
+        if (lastImageArea != null) {
+            repaint(lastImageArea);
+        }
+        if (newImageArea != null) {
+            repaint(newImageArea);
+        }
+        lastImageArea = newImageArea;
     }
 
     @Override
@@ -279,11 +298,19 @@ public class BongoCatAnimator extends JComponent implements ComponentListener, D
         }
     }
 
+    // 스크롤할 때마다 에디터 본문이 움직여 이 이벤트들이 발생합니다.
+    // 숨어 있을 때 setBounds 하면 매 스크롤마다 화면 전체 다시 그리기가 일어나므로, 보일 때만 맞춥니다.
     @Override
-    public void componentResized(ComponentEvent e) { updateBounds(); }
+    public void componentResized(ComponentEvent e) { updateBoundsIfVisible(); }
 
     @Override
-    public void componentMoved(ComponentEvent e) { updateBounds(); }
+    public void componentMoved(ComponentEvent e) { updateBoundsIfVisible(); }
+
+    private void updateBoundsIfVisible() {
+        if (currentImage != null) {
+            updateBounds();
+        }
+    }
 
     private void updateBounds() {
         this.setBounds(editor.getScrollingModel().getVisibleArea().getBounds());
